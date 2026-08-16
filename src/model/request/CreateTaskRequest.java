@@ -1,0 +1,20 @@
+package model.request;
+
+import entity.TaskEntity;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiFunction;
+
+public record CreateTaskRequest(BiFunction<Map<String, Object>, List<Object>, Object> code,
+                                List<CreateTaskRequest> nextTasks, List<Object> fixedInputs) {
+
+    public TaskEntity toTaskEntity() {
+        return new TaskEntity(code);
+    }
+
+    public boolean isValid() {
+        return Objects.nonNull(code);
+    }
+}

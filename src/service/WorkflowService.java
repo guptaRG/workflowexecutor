@@ -1,11 +1,8 @@
 package service;
 
-import entity.Workflow;
-import model.ExecuteWorkflowOutput;
+import entity.WorkflowEntity;
 import model.request.CreateWorkflowRequest;
-import model.request.ExecuteWorkflowRequest;
 
 public interface WorkflowService {
-    Workflow create(CreateWorkflowRequest createWorkflowRequest);
-    ExecuteWorkflowOutput execute(ExecuteWorkflowRequest executeWorkflowRequest);
+    WorkflowEntity create(CreateWorkflowRequest createWorkflowRequest);
 }
