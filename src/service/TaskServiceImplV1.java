@@ -32,11 +32,13 @@ public class TaskServiceImplV1 implements TaskService {
         }
         TaskEntity t = taskRepository.save(createTaskRequest.toTaskEntity());
         try {
-            taskFixedInputRepository.saveAll(createTaskRequest
-                    .fixedInputs()
-                    .stream()
-                    .map(input -> new TaskFixedInputEntity(input, t))
-                    .toList());
+            if (Objects.nonNull(createTaskRequest.fixedInputs())) {
+                taskFixedInputRepository.saveAll(createTaskRequest
+                        .fixedInputs()
+                        .stream()
+                        .map(input -> new TaskFixedInputEntity(input, t))
+                        .toList());
+            }
             return t;
         } catch (Exception e) {
             taskRepository.delete(t);
@@ -57,6 +59,9 @@ public class TaskServiceImplV1 implements TaskService {
             List<TaskFixedInputEntity> fixedInputs = new ArrayList<>();
             int taskSize = createTaskRequests.size();
             for (int i = 0; i < taskSize; i++) {
+                if (Objects.isNull(createTaskRequests.get(i).fixedInputs())) {
+                    continue;
+                }
                 for (Object fixedInput : createTaskRequests.get(i).fixedInputs()) {
                     fixedInputs.add(new TaskFixedInputEntity(fixedInput, t.get(i)));
                 }

@@ -1,6 +1,7 @@
 package model.request;
 
 import entity.TaskEntity;
+import entity.TaskFixedInputEntity;
 
 import java.util.List;
 import java.util.Map;

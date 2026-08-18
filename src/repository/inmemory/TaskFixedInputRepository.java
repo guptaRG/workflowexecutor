@@ -23,8 +23,8 @@ public class TaskFixedInputRepository extends AbstractInMemoryRepository<TaskFix
         return entity;
     }
 
-    public List<TaskFixedInputEntity> getAllByTaskId(String taskId) {
-        return idxByTaskId.getOrDefault(taskId, new ArrayList<>())
+    public List<TaskFixedInputEntity> getAllByTaskRunId(String taskRunId) {
+        return idxByTaskId.getOrDefault(taskRunId, new ArrayList<>())
                 .stream()
                 .map(id -> this.getById(id).orElseThrow())
                 .toList();

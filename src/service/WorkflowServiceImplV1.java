@@ -4,8 +4,10 @@ import entity.TaskEntity;
 import entity.WorkflowEntity;
 import entity.WorkflowStartingTaskEntity;
 import exception.InvalidRequestException;
+import model.ExecuteWorkflowResult;
 import model.request.CreateTaskRequest;
 import model.request.CreateWorkflowRequest;
+import model.request.ExecuteWorkflowRequest;
 import repository.inmemory.WorkflowRepository;
 import repository.inmemory.WorkflowRunRepository;
 import repository.inmemory.WorkflowStartingTaskRepository;
@@ -41,6 +43,11 @@ public class WorkflowServiceImplV1 implements WorkflowService {
             workflowRepository.delete(workflow);
             throw e;
         }
+    }
+
+    @Override
+    public ExecuteWorkflowResult execute(ExecuteWorkflowRequest request) {
+        return null;
     }
 
     private void createWorkflowTasks(CreateWorkflowRequest createWorkflowRequest, WorkflowEntity workflowEntity) {
