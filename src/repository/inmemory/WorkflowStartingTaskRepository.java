@@ -2,10 +2,7 @@ package repository.inmemory;
 
 import entity.WorkflowStartingTaskEntity;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class WorkflowStartingTaskRepository extends AbstractInMemoryRepository<WorkflowStartingTaskEntity> {
     private final Map<String, List<String>> idxByWorkflowId;
@@ -26,7 +23,9 @@ public class WorkflowStartingTaskRepository extends AbstractInMemoryRepository<W
     public List<WorkflowStartingTaskEntity> getByWorkflowId(String workflowId) {
         return idxByWorkflowId.getOrDefault(workflowId, new ArrayList<>())
                 .stream()
-                .map(id -> this.getById(id).orElseThrow())
+                .map(id -> this.getById(id).orElse(null))
+                .filter(workflowStartingTaskEntity ->
+                        Objects.nonNull(workflowStartingTaskEntity) && workflowStartingTaskEntity.isActive())
                 .toList();
     }
 }

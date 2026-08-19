@@ -2,10 +2,7 @@ package repository.inmemory;
 
 import entity.TaskRunEntity;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class TaskRunRepository extends AbstractInMemoryRepository<TaskRunEntity> {
     private final Map<String, List<String>> idxByWorkflowRunId;
@@ -26,7 +23,8 @@ public class TaskRunRepository extends AbstractInMemoryRepository<TaskRunEntity>
     public List<TaskRunEntity> getByWorkflowRunId(String workflowRunId) {
         return idxByWorkflowRunId.getOrDefault(workflowRunId, new ArrayList<>())
                 .stream()
-                .map(id -> this.getById(id).orElseThrow())
+                .map(id -> this.getById(id).orElse(null))
+                .filter(taskRunEntity -> Objects.nonNull(taskRunEntity) && taskRunEntity.isActive())
                 .toList();
     }
 }

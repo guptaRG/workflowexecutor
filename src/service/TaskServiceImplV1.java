@@ -1,28 +1,27 @@
 package service;
 
-import entity.NextTaskEntity;
-import entity.TaskEntity;
-import entity.TaskFixedInputEntity;
+import entity.*;
 import exception.InvalidRequestException;
 import model.request.CreateTaskRequest;
 import repository.inmemory.NextTaskRepository;
 import repository.inmemory.TaskFixedInputRepository;
 import repository.inmemory.TaskRepository;
+import repository.inmemory.TaskRunRepository;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class TaskServiceImplV1 implements TaskService {
     private final TaskRepository taskRepository;
     private final NextTaskRepository nextTaskRepository;
     private final TaskFixedInputRepository taskFixedInputRepository;
+    private final TaskRunRepository taskRunRepository;
 
     public TaskServiceImplV1(TaskRepository taskRepository, NextTaskRepository nextTaskRepository,
-                             TaskFixedInputRepository taskFixedInputRepository) {
+                             TaskFixedInputRepository taskFixedInputRepository, TaskRunRepository taskRunRepository) {
         this.taskRepository = taskRepository;
         this.nextTaskRepository = nextTaskRepository;
         this.taskFixedInputRepository = taskFixedInputRepository;
+        this.taskRunRepository = taskRunRepository;
     }
 
     @Override
@@ -80,5 +79,27 @@ public class TaskServiceImplV1 implements TaskService {
             throw new InvalidRequestException("Invalid create next task request", null);
         }
         return nextTasks.stream().map(t -> nextTaskRepository.save(new NextTaskEntity(parent, t))).toList();
+    }
+
+    @Override
+    public List<TaskRunEntity> createTaskRunEntities(WorkflowRunEntity workflow,
+                                                     List<WorkflowStartingTaskEntity> startingTasks) {
+        List<TaskRunEntity> taskRunEntities = new ArrayList<>();
+        List<TaskEntity> startingTaskEntities = startingTasks.stream()
+                .map(WorkflowStartingTaskEntity::getStartingTask)
+                .toList();
+        Set<TaskEntity> visited = new HashSet<>(startingTaskEntities);
+        Queue<TaskEntity> queue = new LinkedList<>(startingTaskEntities);
+        while (!queue.isEmpty()) {
+            TaskEntity taskEntity = queue.poll();
+            taskRunEntities.add(new TaskRunEntity(taskEntity, workflow));
+            for (NextTaskEntity nextTask : nextTaskRepository.getAllByTaskId(taskEntity.getId())) {
+                if (!visited.contains(nextTask.getNextTask())) {
+                    queue.add(nextTask.getNextTask());
+                    visited.add(nextTask.getNextTask());
+                }
+            }
+        }
+        return taskRunRepository.saveAll(taskRunEntities);
     }
 }

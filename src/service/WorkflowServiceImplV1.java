@@ -1,31 +1,35 @@
 package service;
 
-import entity.TaskEntity;
-import entity.WorkflowEntity;
-import entity.WorkflowStartingTaskEntity;
+import entity.*;
 import exception.InvalidRequestException;
 import model.ExecuteWorkflowResult;
+import model.TaskInput;
 import model.request.CreateTaskRequest;
 import model.request.CreateWorkflowRequest;
 import model.request.ExecuteWorkflowRequest;
+import repository.inmemory.NextTaskRepository;
 import repository.inmemory.WorkflowRepository;
 import repository.inmemory.WorkflowRunRepository;
 import repository.inmemory.WorkflowStartingTaskRepository;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class WorkflowServiceImplV1 implements WorkflowService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowStartingTaskRepository workflowStartingTaskRepository;
+    private final NextTaskRepository nextTaskRepository;
     private final TaskService taskService;
 
     public WorkflowServiceImplV1(WorkflowRepository workflowRepository, WorkflowRunRepository workflowRunRepository,
                                  WorkflowStartingTaskRepository workflowStartingTaskRepository,
-                                 TaskService taskService) {
+                                 NextTaskRepository nextTaskRepository, TaskService taskService) {
         this.workflowRepository = workflowRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowStartingTaskRepository = workflowStartingTaskRepository;
+        this.nextTaskRepository = nextTaskRepository;
         this.taskService = taskService;
     }
 
@@ -47,7 +51,36 @@ public class WorkflowServiceImplV1 implements WorkflowService {
 
     @Override
     public ExecuteWorkflowResult execute(ExecuteWorkflowRequest request) {
+        if (!request.isValid()) {
+            throw new InvalidRequestException("Invalid execute workflow request", null);
+        }
+        WorkflowEntity workflow = workflowRepository.getById(request.workflowId()).orElseThrow();
+        List<WorkflowStartingTaskEntity> startingTasks = workflowStartingTaskRepository.getByWorkflowId(request
+                .workflowId());
+        Map<String, TaskInput> taskInputMap = request.startingTaskInputs()
+                .stream()
+                .collect(Collectors.toMap(TaskInput::taskId, Function.identity()));
+        validateStartingInputs(taskInputMap, startingTasks);
+        WorkflowRunEntity workflowRunEntity = workflowRunRepository.save(new WorkflowRunEntity(workflow));
+        Map<String, TaskRunEntity> taskIdToTaskRunMap = taskService.createTaskRunEntities(workflowRunEntity, startingTasks)
+                .stream()
+                .collect(Collectors.toMap(taskRun -> taskRun.getTask().getId(), Function.identity()));
         return null;
+    }
+
+    private ExecuteWorkflowResult runWorkflowTasks(List<WorkflowStartingTaskEntity> startingTasks,
+                                  Map<String, TaskRunEntity> taskIdToTaskRunMap, List<TaskInput> taskFixedInputs) {
+        
+    }
+
+    private void validateStartingInputs(Map<String, TaskInput> taskInputRequestMap,
+                                        List<WorkflowStartingTaskEntity> startingTasks) {
+        for (WorkflowStartingTaskEntity startingTask : startingTasks) {
+            if (!taskInputRequestMap.containsKey(startingTask.getStartingTask().getId())) {
+                throw new InvalidRequestException(String.format("Missing starting task %s",
+                        startingTask.getStartingTask().getId()), null);
+            }
+        }
     }
 
     private void createWorkflowTasks(CreateWorkflowRequest createWorkflowRequest, WorkflowEntity workflowEntity) {

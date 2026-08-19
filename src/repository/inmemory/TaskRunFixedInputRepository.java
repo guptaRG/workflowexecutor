@@ -2,10 +2,7 @@ package repository.inmemory;
 
 import entity.TaskRunFixedInputEntity;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class TaskRunFixedInputRepository extends AbstractInMemoryRepository<TaskRunFixedInputEntity> {
     private final Map<String, List<String>> idxByTaskRunId;
@@ -26,7 +23,8 @@ public class TaskRunFixedInputRepository extends AbstractInMemoryRepository<Task
     public List<TaskRunFixedInputEntity> getAllByTaskRunId(String taskRunId) {
         return idxByTaskRunId.getOrDefault(taskRunId, new ArrayList<>())
                 .stream()
-                .map(id -> this.getById(id).orElseThrow())
+                .map(id -> this.getById(id).orElse(null))
+                .filter(taskRunFixedInput -> Objects.nonNull(taskRunFixedInput) && taskRunFixedInput.isActive())
                 .toList();
     }
 }

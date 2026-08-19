@@ -2,10 +2,7 @@ package repository.inmemory;
 
 import entity.NextTaskEntity;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class NextTaskRepository extends AbstractInMemoryRepository<NextTaskEntity> {
     private final Map<String, List<String>> idxByTaskId;
@@ -26,7 +23,8 @@ public class NextTaskRepository extends AbstractInMemoryRepository<NextTaskEntit
     public List<NextTaskEntity> getAllByTaskId(String taskId) {
         return idxByTaskId.getOrDefault(taskId, new ArrayList<>())
                 .stream()
-                .map(id -> this.getById(id).orElseThrow())
+                .map(id -> this.getById(id).orElse(null))
+                .filter(nextTask -> Objects.nonNull(nextTask) && nextTask.isActive())
                 .toList();
     }
 }

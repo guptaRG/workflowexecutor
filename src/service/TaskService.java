@@ -1,7 +1,6 @@
 package service;
 
-import entity.NextTaskEntity;
-import entity.TaskEntity;
+import entity.*;
 import model.request.CreateTaskRequest;
 
 import java.util.List;
@@ -10,4 +9,6 @@ public interface TaskService {
     TaskEntity create(CreateTaskRequest createTaskRequest);
     List<TaskEntity> createAll(List<CreateTaskRequest> createTaskRequests);
     List<NextTaskEntity> createNextTasks(TaskEntity parent, List<TaskEntity> nextTasks);
+    List<TaskRunEntity> createTaskRunEntities(WorkflowRunEntity workflow,
+                                              List<WorkflowStartingTaskEntity> startingTasks);
 }
