@@ -2,26 +2,28 @@ package service;
 
 import entity.*;
 import exception.InvalidRequestException;
+import model.TaskInput;
 import model.request.CreateTaskRequest;
-import repository.inmemory.NextTaskRepository;
-import repository.inmemory.TaskFixedInputRepository;
-import repository.inmemory.TaskRepository;
-import repository.inmemory.TaskRunRepository;
+import repository.inmemory.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class TaskServiceImplV1 implements TaskService {
     private final TaskRepository taskRepository;
     private final NextTaskRepository nextTaskRepository;
     private final TaskFixedInputRepository taskFixedInputRepository;
     private final TaskRunRepository taskRunRepository;
+    private final TaskRunFixedInputRepository taskRunFixedInputRepository;
 
     public TaskServiceImplV1(TaskRepository taskRepository, NextTaskRepository nextTaskRepository,
-                             TaskFixedInputRepository taskFixedInputRepository, TaskRunRepository taskRunRepository) {
+                             TaskFixedInputRepository taskFixedInputRepository, TaskRunRepository taskRunRepository,
+                             TaskRunFixedInputRepository taskRunFixedInputRepository) {
         this.taskRepository = taskRepository;
         this.nextTaskRepository = nextTaskRepository;
         this.taskFixedInputRepository = taskFixedInputRepository;
         this.taskRunRepository = taskRunRepository;
+        this.taskRunFixedInputRepository = taskRunFixedInputRepository;
     }
 
     @Override
@@ -83,16 +85,34 @@ public class TaskServiceImplV1 implements TaskService {
 
     @Override
     public List<TaskRunEntity> createTaskRunEntities(WorkflowRunEntity workflow,
-                                                     List<WorkflowStartingTaskEntity> startingTasks) {
+                                                     List<WorkflowStartingTaskEntity> startingTasks,
+                                                     List<TaskInput> taskInputs) {
         List<TaskRunEntity> taskRunEntities = new ArrayList<>();
         List<TaskEntity> startingTaskEntities = startingTasks.stream()
                 .map(WorkflowStartingTaskEntity::getStartingTask)
                 .toList();
         Set<TaskEntity> visited = new HashSet<>(startingTaskEntities);
         Queue<TaskEntity> queue = new LinkedList<>(startingTaskEntities);
+        Map<String, List<Object>> taskInputMap = new HashMap<>();
+        for (TaskInput taskInput : taskInputs) {
+            taskInputMap.putIfAbsent(taskInput.taskId(), new ArrayList<>());
+            taskInputMap.get(taskInput.taskId()).add(taskInput);
+        }
+        List<TaskRunFixedInputEntity> taskRunFixedInputs = new ArrayList<>();
         while (!queue.isEmpty()) {
             TaskEntity taskEntity = queue.poll();
-            taskRunEntities.add(new TaskRunEntity(taskEntity, workflow));
+            TaskRunEntity tr = new TaskRunEntity(taskEntity, workflow);
+            taskRunEntities.add(tr);
+            if (taskInputMap.containsKey(taskEntity.getId())) {
+                taskRunFixedInputs.addAll(taskInputMap.get(taskEntity.getId()).stream().map(ti ->
+                        new TaskRunFixedInputEntity(ti, tr)).toList());
+            } else {
+                taskRunFixedInputs.addAll(taskFixedInputRepository
+                        .getAllByTaskId(taskEntity.getId())
+                        .stream()
+                        .map(taskFixed -> new TaskRunFixedInputEntity(taskFixed.getInput(), tr))
+                        .toList());
+            }
             for (NextTaskEntity nextTask : nextTaskRepository.getAllByTaskId(taskEntity.getId())) {
                 if (!visited.contains(nextTask.getNextTask())) {
                     queue.add(nextTask.getNextTask());
@@ -100,6 +120,13 @@ public class TaskServiceImplV1 implements TaskService {
                 }
             }
         }
-        return taskRunRepository.saveAll(taskRunEntities);
+        taskRunEntities = taskRunRepository.saveAll(taskRunEntities);
+        try {
+            taskRunFixedInputRepository.saveAll(taskRunFixedInputs);
+            return taskRunEntities;
+        } catch (Exception e) {
+            taskRunEntities.forEach(taskRunRepository::delete);
+            throw e;
+        }
     }
 }

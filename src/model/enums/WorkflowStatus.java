@@ -14,7 +14,7 @@ public enum WorkflowStatus {
         toStatuses.put(IN_PROGRESS, Set.of(WorkflowStatus.SUCCESS, WorkflowStatus.FAILED));
     }
 
-    public static boolean isValidStatusUpdate(WorkflowStatus fromStatus, WorkflowStatus toStatus) {
-        return toStatuses.containsKey(fromStatus) && toStatuses.get(fromStatus).contains(toStatus);
+    public boolean isValidStatusUpdate(WorkflowStatus toStatus) {
+        return toStatuses.containsKey(this) && toStatuses.get(this).contains(toStatus);
     }
 }

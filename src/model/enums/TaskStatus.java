@@ -14,7 +14,7 @@ public enum TaskStatus {
         toStatuses.put(IN_PROGRESS, Set.of(TaskStatus.SUCCESS, TaskStatus.FAILED));
     }
 
-    public static boolean isValidStatusUpdate(TaskStatus fromStatus, TaskStatus toStatus) {
-        return toStatuses.containsKey(fromStatus) && toStatuses.get(fromStatus).contains(toStatus);
+    public boolean isValidStatusUpdate(TaskStatus toStatus) {
+        return toStatuses.containsKey(this) && toStatuses.get(this).contains(toStatus);
     }
 }

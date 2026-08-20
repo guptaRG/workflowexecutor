@@ -4,6 +4,7 @@ import entity.*;
 import exception.InvalidRequestException;
 import model.ExecuteWorkflowResult;
 import model.TaskInput;
+import model.enums.WorkflowStatus;
 import model.request.CreateTaskRequest;
 import model.request.CreateWorkflowRequest;
 import model.request.ExecuteWorkflowRequest;
@@ -57,29 +58,27 @@ public class WorkflowServiceImplV1 implements WorkflowService {
         WorkflowEntity workflow = workflowRepository.getById(request.workflowId()).orElseThrow();
         List<WorkflowStartingTaskEntity> startingTasks = workflowStartingTaskRepository.getByWorkflowId(request
                 .workflowId());
-        Map<String, TaskInput> taskInputMap = request.startingTaskInputs()
-                .stream()
-                .collect(Collectors.toMap(TaskInput::taskId, Function.identity()));
-        validateStartingInputs(taskInputMap, startingTasks);
         WorkflowRunEntity workflowRunEntity = workflowRunRepository.save(new WorkflowRunEntity(workflow));
-        Map<String, TaskRunEntity> taskIdToTaskRunMap = taskService.createTaskRunEntities(workflowRunEntity, startingTasks)
+        Map<String, TaskRunEntity> taskIdToTaskRunMap = taskService.createTaskRunEntities(workflowRunEntity,
+                        startingTasks, request.taskFixedInputs())
                 .stream()
-                .collect(Collectors.toMap(taskRun -> taskRun.getTask().getId(), Function.identity()));
+                .collect(Collectors.toMap(taskRun ->taskRun.getTask().getId(), Function.identity()));
         return null;
     }
 
     private ExecuteWorkflowResult runWorkflowTasks(List<WorkflowStartingTaskEntity> startingTasks,
-                                  Map<String, TaskRunEntity> taskIdToTaskRunMap, List<TaskInput> taskFixedInputs) {
-        
-    }
+                                                   WorkflowRunEntity workflowRun,
+                                                   Map<String, TaskRunEntity> taskIdToTaskRunMap,
+                                                   List<TaskInput> taskFixedInputs) {
+        workflowRun = workflowRunRepository.updateStatus(workflowRun, WorkflowStatus.IN_PROGRESS);
+        List<TaskRunEntity> startingTaskRuns = startingTasks.stream()
+                .map(t -> taskIdToTaskRunMap.get(t.getStartingTask().getId()))
+                .toList();
+        Queue<TaskRunEntity> q = new LinkedList<>(startingTaskRuns);
+//        Set<TaskRunEntity> visited = new HashSet<>(startingTaskRuns);
+        while (!q.isEmpty()) {
+            TaskRunEntity taskRun = q.poll();
 
-    private void validateStartingInputs(Map<String, TaskInput> taskInputRequestMap,
-                                        List<WorkflowStartingTaskEntity> startingTasks) {
-        for (WorkflowStartingTaskEntity startingTask : startingTasks) {
-            if (!taskInputRequestMap.containsKey(startingTask.getStartingTask().getId())) {
-                throw new InvalidRequestException(String.format("Missing starting task %s",
-                        startingTask.getStartingTask().getId()), null);
-            }
         }
     }
 
