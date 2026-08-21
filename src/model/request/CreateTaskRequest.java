@@ -9,10 +9,10 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 
 public record CreateTaskRequest(BiFunction<Map<String, Object>, List<Object>, Object> code,
-                                List<CreateTaskRequest> nextTasks, List<Object> fixedInputs) {
+                                List<CreateTaskRequest> nextTasks, List<Object> fixedInputs, String name) {
 
     public TaskEntity toTaskEntity() {
-        return new TaskEntity(code);
+        return new TaskEntity(code, name);
     }
 
     public boolean isValid() {

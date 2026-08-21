@@ -26,7 +26,7 @@ public class TaskRunEntity extends BaseEntity {
         return workflowRun;
     }
 
-    public Object getFutureResult() {
+    public CompletableFuture<Object> getFutureResult() {
         return futureResult;
     }
 
@@ -48,5 +48,14 @@ public class TaskRunEntity extends BaseEntity {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    @Override
+    public String toString() {
+        return "TaskRunEntity{" +
+                "task=" + task +
+                ", workflowRun=" + workflowRun +
+                ", status=" + status +
+                '}';
     }
 }
