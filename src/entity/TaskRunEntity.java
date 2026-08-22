@@ -2,10 +2,12 @@ package entity;
 
 import model.enums.TaskStatus;
 
+import java.util.concurrent.CompletableFuture;
+
 public class TaskRunEntity extends BaseEntity {
     private final TaskEntity task;
     private final WorkflowRunEntity workflowRun;
-    private Object result;
+    private CompletableFuture<Object> futureResult;
     private TaskStatus status;
     private String failureReason;
 
@@ -24,12 +26,12 @@ public class TaskRunEntity extends BaseEntity {
         return workflowRun;
     }
 
-    public Object getResult() {
-        return result;
+    public CompletableFuture<Object> getFutureResult() {
+        return futureResult;
     }
 
-    public void setResult(Object result) {
-        this.result = result;
+    public void setFutureResult(CompletableFuture<Object> futureResult) {
+        this.futureResult = futureResult;
     }
 
     public TaskStatus getStatus() {
@@ -46,5 +48,14 @@ public class TaskRunEntity extends BaseEntity {
 
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
+    }
+
+    @Override
+    public String toString() {
+        return "TaskRunEntity{" +
+                "task=" + task +
+                ", workflowRun=" + workflowRun +
+                ", status=" + status +
+                '}';
     }
 }

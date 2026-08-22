@@ -1,8 +1,28 @@
 package model;
 
-import java.util.List;
+import constants.StringConstants;
+import entity.WorkflowRunEntity;
 
-public record ExecuteWorkflowResult(String workflowId, List<EndTaskResult> endTaskResultList, String failureReason) {
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
-    public static record EndTaskResult(String taskId, Object result) {}
+public record ExecuteWorkflowResult(WorkflowRunEntity workflowRun,
+                                    Map<String, CompletableFuture<Object>> endTaskFutures, String failureReason) {
+
+    public ExecuteWorkflowResult(WorkflowRunEntity workflowRun, String failureReason) {
+        this(workflowRun, Map.of(), failureReason);
+    }
+
+    public ExecuteWorkflowResult(WorkflowRunEntity workflowRun,
+                                 Map<String, CompletableFuture<Object>> endTaskResultList) {
+        this(workflowRun, endTaskResultList, StringConstants.EMPTY_STR);
+    }
+
+    @Override
+    public String toString() {
+        return "ExecuteWorkflowResult{" +
+                "workflowRun=" + workflowRun +
+                ", failureReason='" + failureReason + '\'' +
+                '}';
+    }
 }

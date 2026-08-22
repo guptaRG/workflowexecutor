@@ -32,4 +32,13 @@ public class WorkflowRunEntity extends BaseEntity {
     public void setFailureReason(String failureReason) {
         this.failureReason = failureReason;
     }
+
+    @Override
+    public String toString() {
+        return "WorkflowRunEntity{" +
+                "workflow=" + workflow +
+                ", status=" + status +
+                ", failureReason='" + failureReason + '\'' +
+                '}';
+    }
 }
