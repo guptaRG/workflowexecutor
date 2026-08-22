@@ -68,17 +68,13 @@ public class WorkflowServiceImplV1 implements WorkflowService {
         List<WorkflowStartingTaskEntity> startingTasks = workflowStartingTaskRepository.getByWorkflowId(request
                 .workflowId());
         WorkflowRunEntity workflowRunEntity = workflowRunRepository.save(new WorkflowRunEntity(workflow));
-        Map<String, TaskRunEntity> taskIdToTaskRunMap = taskService.createTaskRunEntities(workflowRunEntity,
-                        startingTasks, request.taskFixedInputs())
-                .stream()
-                .collect(Collectors.toMap(taskRun ->taskRun.getTask().getId(), Function.identity()));
-        return null;
+        taskService.createTaskRunEntities(workflowRunEntity,startingTasks, request.taskFixedInputs());
+        return runWorkflowTasks(startingTasks, workflowRunEntity);
     }
 
     private ExecuteWorkflowResult runWorkflowTasks(List<WorkflowStartingTaskEntity> startingTasks,
-                                                   WorkflowRunEntity workflowRun,
-                                                   Map<String, TaskRunEntity> taskIdToTaskRunMap,
-                                                   List<TaskInput> taskFixedInputs) {
+                                                   WorkflowRunEntity workflowRun) {
+
         final String workflowRunId = workflowRun.getId();
         workflowRun = workflowRunRepository.updateStatus(workflowRun, WorkflowStatus.IN_PROGRESS);
         List<TaskRunEntity> startingTaskRuns = startingTasks.stream().map(t ->
@@ -154,16 +150,19 @@ public class WorkflowServiceImplV1 implements WorkflowService {
                 .toList());
         while (!queue.isEmpty()) {
             CreateTaskRequest current = queue.poll();
-            List<TaskEntity> nextTaskEntities = new ArrayList<>();
-            for (CreateTaskRequest taskRequest : current.nextTasks()) {
-                if (!visited.contains(taskRequest)) {
-                    visited.add(taskRequest);
-                    queue.add(taskRequest);
-                    requestToEntityMap.put(taskRequest, taskService.create(taskRequest));
+            List<CreateTaskRequest> nextTaskRequests = current.nextTasks();
+            if (Objects.nonNull(nextTaskRequests)) {
+                List<TaskEntity> nextTaskEntities = new ArrayList<>();
+                for (CreateTaskRequest taskRequest : nextTaskRequests) {
+                    if (!visited.contains(taskRequest)) {
+                        visited.add(taskRequest);
+                        queue.add(taskRequest);
+                        requestToEntityMap.put(taskRequest, taskService.create(taskRequest));
+                    }
+                    nextTaskEntities.add(requestToEntityMap.get(taskRequest));
                 }
-                nextTaskEntities.add(requestToEntityMap.get(taskRequest));
+                taskService.createNextTasks(requestToEntityMap.get(current), nextTaskEntities);
             }
-            taskService.createNextTasks(requestToEntityMap.get(current), nextTaskEntities);
         }
     }
 }

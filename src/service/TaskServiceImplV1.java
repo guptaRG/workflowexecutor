@@ -98,9 +98,11 @@ public class TaskServiceImplV1 implements TaskService {
         Set<TaskEntity> visited = new HashSet<>(startingTaskEntities);
         Queue<TaskEntity> queue = new LinkedList<>(startingTaskEntities);
         Map<String, List<Object>> taskInputMap = new HashMap<>();
-        for (TaskInput taskInput : taskInputs) {
-            taskInputMap.putIfAbsent(taskInput.taskId(), new ArrayList<>());
-            taskInputMap.get(taskInput.taskId()).add(taskInput);
+        if (Objects.nonNull(taskInputs)) {
+            for (TaskInput taskInput : taskInputs) {
+                taskInputMap.putIfAbsent(taskInput.taskId(), new ArrayList<>());
+                taskInputMap.get(taskInput.taskId()).add(taskInput);
+            }
         }
         List<TaskRunFixedInputEntity> taskRunFixedInputs = new ArrayList<>();
         while (!queue.isEmpty()) {

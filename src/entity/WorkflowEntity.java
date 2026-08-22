@@ -25,4 +25,12 @@ public class WorkflowEntity extends BaseEntity {
     public String getDesc() {
         return desc;
     }
+
+    @Override
+    public String toString() {
+        return "WorkflowEntity{" +
+                "name='" + name + '\'' +
+                ", desc='" + desc + '\'' +
+                '}';
+    }
 }
