@@ -1,4 +1,5 @@
 import entity.WorkflowEntity;
+import model.ExecuteWorkflowResult;
 import model.request.CreateTaskRequest;
 import model.request.CreateWorkflowRequest;
 import model.request.ExecuteWorkflowRequest;
@@ -9,10 +10,13 @@ import service.WorkflowService;
 import service.WorkflowServiceImplV1;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException, TimeoutException {
         Scanner sc = new Scanner(System.in);
         // Repository init
         NextTaskRepository nextTaskRepository = new NextTaskRepository();
@@ -28,8 +32,7 @@ public class Main {
         TaskService taskService = new TaskServiceImplV1(taskRepository, nextTaskRepository,
                 taskFixedInputRepository, taskRunRepository, taskRunFixedInputRepository);
         WorkflowService workflowService = new WorkflowServiceImplV1(workflowRepository, workflowRunRepository,
-                workflowStartingTaskRepository, nextTaskRepository, taskRunRepository, taskRunFixedInputRepository,
-                taskService);
+                workflowStartingTaskRepository, nextTaskRepository, taskRunRepository, taskService);
 
         // Entity init
         CreateTaskRequest taskRequest5 = new CreateTaskRequest((inputResults, fixedInputs) -> {
@@ -51,7 +54,7 @@ public class Main {
         CreateTaskRequest taskRequest2 = new CreateTaskRequest((inputResults, fixedInputs) -> {
             System.out.println("Task 2 executing with " + inputResults);
             return "Task2: Process input          depends on -> Task1";
-        }, List.of(taskRequest3, taskRequest4), null, "Task3");
+        }, List.of(taskRequest3, taskRequest4), null, "Task2");
         CreateTaskRequest taskRequest1 = new CreateTaskRequest((inputResults, fixedInputs) -> {
             System.out.println("Task 1 executing with " + inputResults);
             return "Task1: Read input";
@@ -59,8 +62,22 @@ public class Main {
 
         WorkflowEntity workflow = workflowService.create(new CreateWorkflowRequest("WorkflowExample",
                 "https://docs.google.com/document/d/1eBQK_L7HQaEAXzOStf4GNhTMimpFwTRDE-fWgMWtZQg/edit?tab=t.0",
-                List.of(taskRequest1), 1, 5));
+                List.of(taskRequest1), 1, 6));
         System.out.println(workflow);
-        System.out.println(workflowService.execute(new ExecuteWorkflowRequest(workflow.getId(), null)));
+        ExecuteWorkflowResult executeWorkflowResult = workflowService.execute(new ExecuteWorkflowRequest(
+                workflow.getId(), null));
+        System.out.println(executeWorkflowResult);
+        for (Map.Entry<String, CompletableFuture<Object>> entry : executeWorkflowResult.endTaskFutures().entrySet()) {
+            String taskId = entry.getKey();
+            CompletableFuture<Object> future = entry.getValue();
+            future.thenAccept(result -> {
+                System.out.println("Task " + taskId + " completed with result: " + result);
+            }).exceptionally(ex -> {
+                System.err.println("Task " + taskId + " failed with exception: " + ex.getMessage());
+                return null;
+            });
+        }
+        System.out.println(executeWorkflowResult.workflowRun());
+        workflowService.delete(workflow);
     }
 }

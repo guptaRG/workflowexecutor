@@ -6,4 +6,5 @@ public interface IntegerConstants {
     int DEFAULT_THREAD_POOL_CORE_SIZE = 2;
     int DEFAULT_THREAD_POOL_MAX_SIZE = 20;
     int DEFAULT_THREAD_POOL_KEEP_ALIVE_TIME_SEC = 2;
+    int THREAD_POOL_TERMINATION_WAIT_SEC = 10;
 }
