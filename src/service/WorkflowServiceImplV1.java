@@ -86,74 +86,56 @@ public class WorkflowServiceImplV1 implements WorkflowService {
                                 t.getStartingTask().getId()).orElseThrow()).toList();
         Queue<TaskRunEntity> q = new LinkedList<>(startingTaskRuns);
         Set<TaskRunEntity> visited = new HashSet<>(startingTaskRuns);
-        while (!q.isEmpty()) {
-            TaskRunEntity taskRun = q.poll();
-            if (Objects.isNull(taskRun.getFutureResult())) {
-                final List<TaskRunEntity> prevTasks = nextTaskRepository.getAllByNextTaskId(taskRun.getTask().getId())
-                        .stream()
-                        .map(prevTask -> taskRunRepository.getByWorkflowRunTaskId(workflowRunId,
-                                prevTask.getTask().getId()).orElseThrow())
-                        .toList();
-                boolean allHaveFuture = true;
-                for (TaskRunEntity prevTask : prevTasks) {
-                    if (prevTask.getStatus() == TaskStatus.FAILED) {
-                        throw new TaskFailureException(
-                                String.format("Failing task %s because parent task failed with %s", taskRun,
-                                        prevTask.getFailureReason()), null);
+        Map<String, CompletableFuture<Object>> endTaskFutures = new HashMap<>();
+        try {
+            while (!q.isEmpty()) {
+                TaskRunEntity taskRun = q.poll();
+                if (Objects.isNull(taskRun.getFutureResult())) {
+                    final List<TaskRunEntity> prevTasks = nextTaskRepository.getAllByNextTaskId(taskRun.getTask().getId())
+                            .stream()
+                            .map(prevTask -> taskRunRepository.getByWorkflowRunTaskId(workflowRunId,
+                                    prevTask.getTask().getId()).orElseThrow())
+                            .toList();
+                    boolean allHaveFuture = allPrevTaskQueued(prevTasks, taskRun);
+                    if (!allHaveFuture) {
+                        q.add(taskRun);
+                        continue;
                     }
-                    if (Objects.isNull(prevTask.getFutureResult())) {
-                        allHaveFuture = false;
+                    taskRun = taskService.runTask(taskRun, prevTasks, workflowRun);
+                }
+                List<NextTaskEntity> nextTasks = nextTaskRepository.getAllByTaskId(taskRun.getTask().getId());
+                if (nextTasks.isEmpty()) {
+                    endTaskFutures.put(taskRun.getTask().getId(), taskRun.getFutureResult());
+                }
+                for (NextTaskEntity nextTask : nextTasks) {
+                    TaskRunEntity nextTaskRun = taskRunRepository.getByWorkflowRunTaskId(workflowRunId,
+                            nextTask.getNextTask().getId()).orElseThrow();
+                    if (!visited.contains(nextTaskRun)) {
+                        q.add(nextTaskRun);
+                        visited.add(nextTaskRun);
                     }
                 }
-                if (!allHaveFuture) {
-                    q.add(taskRun);
-                    continue;
-                }
-                taskRun.setFutureResult(CompletableFuture
-                        .allOf(prevTasks.stream().map(TaskRunEntity::getFutureResult).toArray(CompletableFuture[]::new))
-                        .thenApplyAsync(() -> {
-                            TaskRunEntity updatedTaskRun = taskRunRepository.updateStatus(taskRun,
-                                    TaskStatus.IN_PROGRESS);
-                            try {
-                                Map<String, Object> results =
-                                        nextTaskRepository.getAllByNextTaskId(updatedTaskRun.getTask().getId())
-                                                .stream()
-                                                .map(prevTask ->
-                                                        taskRunRepository.getByWorkflowRunTaskId(workflowRunId,
-                                                                prevTask.getTask().getId()).orElseThrow())
-                                                .collect(Collectors.toMap(prevTask -> prevTask.getTask().getId(),
-                                                        prevTask -> {
-                                                            try {
-                                                                return prevTask.getFutureResult().get();
-                                                            } catch (InterruptedException | ExecutionException e) {
-                                                                throw new TaskFailureException(
-                                                                        "Parent task result fetch failed", e);
-                                                            }
-                                                        }));
-                                Object currentResult = updatedTaskRun.getTask().getCode().apply(results,
-                                        taskRunFixedInputRepository.getAllByTaskRunId(updatedTaskRun.getId())
-                                                .stream()
-                                                .map(TaskRunFixedInputEntity::getInput)
-                                                .toList());
-                                taskRunRepository.updateStatus(updatedTaskRun, TaskStatus.SUCCESS);
-                                return currentResult;
-                            } catch (Exception e) {
-                                taskRunRepository.updateStatus(updatedTaskRun, TaskStatus.FAILED);
-                                throw new TaskFailureException(String.format("Task %s failed", updatedTaskRun), e)
-                            }
-                        }, workflowRun.getWorkflow().getThreadPool())
-                );
-                taskRunRepository.update(taskRun);
             }
-            for (NextTaskEntity nextTask : nextTaskRepository.getAllByTaskId(taskRun.getTask().getId())) {
-                TaskRunEntity nextTaskRun = taskRunRepository.getByWorkflowRunTaskId(workflowRunId,
-                        nextTask.getNextTask().getId()).orElseThrow();
-                if (!visited.contains(nextTaskRun)) {
-                    q.add(nextTaskRun);
-                    visited.add(nextTaskRun);
-                }
+            return new ExecuteWorkflowResult(workflowRun, endTaskFutures);
+        } catch (Exception e) {
+            workflowRun.setFailureReason(e.getMessage());
+            workflowRunRepository.updateStatus(workflowRun, WorkflowStatus.FAILED);
+            return new ExecuteWorkflowResult(workflowRun, e.getMessage());
+        }
+    }
+
+    private static boolean allPrevTaskQueued(List<TaskRunEntity> prevTasks, TaskRunEntity taskRun) {
+        boolean allHaveFuture = true;
+        for (TaskRunEntity prevTask : prevTasks) {
+            if (prevTask.getStatus() == TaskStatus.FAILED) {
+                throw new TaskFailureException(String.format("Failing task %s because parent task failed with %s",
+                        taskRun, prevTask.getFailureReason()), null);
+            }
+            if (Objects.isNull(prevTask.getFutureResult())) {
+                allHaveFuture = false;
             }
         }
+        return allHaveFuture;
     }
 
     private void createWorkflowTasks(CreateWorkflowRequest createWorkflowRequest, WorkflowEntity workflowEntity) {

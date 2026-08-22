@@ -2,11 +2,15 @@ package service;
 
 import entity.*;
 import exception.InvalidRequestException;
+import exception.TaskFailureException;
 import model.TaskInput;
+import model.enums.TaskStatus;
 import model.request.CreateTaskRequest;
 import repository.inmemory.*;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class TaskServiceImplV1 implements TaskService {
@@ -128,5 +132,44 @@ public class TaskServiceImplV1 implements TaskService {
             taskRunEntities.forEach(taskRunRepository::delete);
             throw e;
         }
+    }
+
+    @Override
+    public TaskRunEntity runTask(TaskRunEntity taskRun, List<TaskRunEntity> prevTasks, WorkflowRunEntity workflowRun) {
+        taskRun.setFutureResult(CompletableFuture
+                .allOf(prevTasks.stream().map(TaskRunEntity::getFutureResult).toArray(CompletableFuture[]::new))
+                .thenApplyAsync((nilResult) -> {
+                    TaskRunEntity updatedTaskRun = taskRunRepository.updateStatus(taskRun, TaskStatus.IN_PROGRESS);
+                    try {
+                        Map<String, Object> results =
+                                nextTaskRepository.getAllByNextTaskId(updatedTaskRun.getTask().getId())
+                                        .stream()
+                                        .map(prevTask -> taskRunRepository.getByWorkflowRunTaskId(workflowRun.getId(),
+                                                prevTask.getTask().getId()).orElseThrow())
+                                        .collect(Collectors.toMap(prevTask -> prevTask.getTask().getId(),
+                                                prevTask -> {
+                                                    try {
+                                                        return prevTask.getFutureResult().get();
+                                                    } catch (InterruptedException | ExecutionException e) {
+                                                        throw new TaskFailureException(
+                                                                "Parent task result fetch failed", e);
+                                                    }
+                                                })
+                                        );
+                        Object currentResult = updatedTaskRun.getTask().getCode().apply(results,
+                                taskRunFixedInputRepository.getAllByTaskRunId(updatedTaskRun.getId())
+                                        .stream()
+                                        .map(TaskRunFixedInputEntity::getInput)
+                                        .toList());
+                        taskRunRepository.updateStatus(updatedTaskRun, TaskStatus.SUCCESS);
+                        return currentResult;
+                    } catch (Exception e) {
+                        updatedTaskRun.setFailureReason(e.getMessage());
+                        taskRunRepository.updateStatus(updatedTaskRun, TaskStatus.FAILED);
+                        throw new TaskFailureException(String.format("Task %s failed", updatedTaskRun), e);
+                    }
+                }, workflowRun.getWorkflow().getThreadPool())
+        );
+        return taskRunRepository.update(taskRun);
     }
 }

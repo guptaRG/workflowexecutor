@@ -13,4 +13,5 @@ public interface TaskService {
     List<TaskRunEntity> createTaskRunEntities(WorkflowRunEntity workflow,
                                               List<WorkflowStartingTaskEntity> startingTasks,
                                               List<TaskInput> taskFixedInputs);
+    TaskRunEntity runTask(TaskRunEntity taskRun, List<TaskRunEntity> prevTasks, WorkflowRunEntity workflowRun);
 }
