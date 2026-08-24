@@ -24,19 +24,17 @@ public class WorkflowServiceImplV1 implements WorkflowService {
     private final WorkflowStartingTaskRepository workflowStartingTaskRepository;
     private final NextTaskRepository nextTaskRepository;
     private final TaskRunRepository taskRunRepository;
-    private final TaskRunFixedInputRepository taskRunFixedInputRepository;
     private final TaskService taskService;
 
     public WorkflowServiceImplV1(WorkflowRepository workflowRepository, WorkflowRunRepository workflowRunRepository,
                                  WorkflowStartingTaskRepository workflowStartingTaskRepository,
                                  NextTaskRepository nextTaskRepository, TaskRunRepository taskRunRepository,
-                                 TaskRunFixedInputRepository taskRunFixedInputRepository, TaskService taskService) {
+                                 TaskService taskService) {
         this.workflowRepository = workflowRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowStartingTaskRepository = workflowStartingTaskRepository;
         this.nextTaskRepository = nextTaskRepository;
         this.taskRunRepository = taskRunRepository;
-        this.taskRunFixedInputRepository = taskRunFixedInputRepository;
         this.taskService = taskService;
     }
 
@@ -70,6 +68,17 @@ public class WorkflowServiceImplV1 implements WorkflowService {
         WorkflowRunEntity workflowRunEntity = workflowRunRepository.save(new WorkflowRunEntity(workflow));
         taskService.createTaskRunEntities(workflowRunEntity,startingTasks, request.taskFixedInputs());
         return runWorkflowTasks(startingTasks, workflowRunEntity);
+    }
+
+    @Override
+    public WorkflowEntity delete(WorkflowEntity workflowEntity) throws InterruptedException, TimeoutException {
+        workflowEntity.getThreadPool().shutdown();
+        if (!workflowEntity.getThreadPool().awaitTermination(IntegerConstants.THREAD_POOL_TERMINATION_WAIT_SEC,
+                TimeUnit.SECONDS)) {
+
+            throw new TimeoutException("Timeout waiting for workflow thread pool to terminate");
+        }
+        return workflowRepository.delete(workflowEntity);
     }
 
     private ExecuteWorkflowResult runWorkflowTasks(List<WorkflowStartingTaskEntity> startingTasks,
@@ -112,6 +121,15 @@ public class WorkflowServiceImplV1 implements WorkflowService {
                     }
                 }
             }
+            CompletableFuture.allOf(endTaskFutures.values().toArray(new CompletableFuture[0])).thenRunAsync(() -> {
+                WorkflowRunEntity workflowRunEntity = workflowRunRepository.getById(workflowRunId).orElseThrow();
+                workflowRunRepository.updateStatus(workflowRunEntity, WorkflowStatus.SUCCESS);
+            }, workflowRun.getWorkflow().getThreadPool()).exceptionally(ex -> {
+                WorkflowRunEntity workflowRunEntity = workflowRunRepository.getById(workflowRunId).orElseThrow();
+                workflowRunEntity.setFailureReason(ex.getMessage());
+                workflowRunRepository.updateStatus(workflowRunEntity, WorkflowStatus.FAILED);
+                return null;
+            });
             return new ExecuteWorkflowResult(workflowRun, endTaskFutures);
         } catch (Exception e) {
             workflowRun.setFailureReason(e.getMessage());
